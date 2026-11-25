@@ -1,23 +1,24 @@
-// Creating Routes for Authentication 
-
 const express = require("express");
 
-// importing authentication controller function 
 const {
-    registerUser, loginUser, getMe
+    registerUser,
+    loginUser,
+    verifyEmail,
+    getMe,
 } = require("../controllers/authController");
 
+const { protect } = require("../middleware/authMiddleware");
 
-// creating express Router
 const router = express.Router();
 
-// creating post route for register the user
+// Public Routes
 router.post("/register", registerUser);
-
-// creating post route  for login user 
-
 router.post("/login", loginUser);
 
-// creating a get route for logged in user profile 
-router.get("/me", getMe);
-module.exports = router
+// Email Verification
+router.get("/verify-email", verifyEmail);
+
+// Protected Routes
+router.get("/me", protect, getMe);
+
+module.exports = router;

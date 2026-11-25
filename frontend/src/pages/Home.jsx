@@ -1,4 +1,6 @@
-import { Link } from "react-router-dom";
+
+import { Link, useNavigate } from "react-router-dom";
+
 import {
     GraduationCap,
     Users,
@@ -10,6 +12,20 @@ import {
 } from "lucide-react";
 
 const Home = () => {
+
+    const navigate = useNavigate();
+
+    // Get Started Handler
+    const handleGetStarted = () => {
+        const token = localStorage.getItem("token");
+
+        if (token) {
+            navigate("/students");
+        } else {
+            navigate("/register");
+        }
+    };
+
     const features = [
         {
             icon: Users,
@@ -36,39 +52,6 @@ const Home = () => {
     return (
         <div className="min-h-screen bg-white">
 
-            {/* Navbar */}
-            <nav className="flex items-center justify-between px-6 md:px-12 py-5 border-b">
-                <Link to="/" className="flex items-center gap-2">
-                    <GraduationCap size={38} className="text-blue-600" />
-                    <h1 className="text-2xl font-bold text-slate-900">
-                        Edu<span className="text-blue-600">Track</span>
-                    </h1>
-                </Link>
-
-                <div className="hidden md:flex items-center gap-8 text-slate-600 font-medium">
-                    <a href="#home" className="hover:text-blue-600">Home</a>
-                    <a href="#features" className="hover:text-blue-600">Features</a>
-                    <a href="#about" className="hover:text-blue-600">About</a>
-                    <a href="#contact" className="hover:text-blue-600">Contact</a>
-                </div>
-
-                <div className="flex items-center gap-3">
-                    <Link
-                        to="/login"
-                        className="text-blue-600 font-semibold hover:text-blue-800"
-                    >
-                        Login
-                    </Link>
-
-                    <Link
-                        to="/register"
-                        className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition"
-                    >
-                        Register
-                    </Link>
-                </div>
-            </nav>
-
             {/* Hero Section */}
             <section
                 id="home"
@@ -92,20 +75,24 @@ const Home = () => {
                         </p>
 
                         <div className="flex flex-wrap gap-4 mt-8">
-                            <Link
-                                to="/register"
+
+                            {/* Get Started */}
+                            <button
+                                onClick={handleGetStarted}
                                 className="flex items-center gap-2 bg-blue-600 text-white px-7 py-3.5 rounded-lg font-semibold hover:bg-blue-700 transition"
                             >
                                 Get Started
                                 <ArrowRight size={20} />
-                            </Link>
+                            </button>
 
+                            {/* Explore Features */}
                             <a
                                 href="#features"
                                 className="border border-blue-600 text-blue-600 px-7 py-3.5 rounded-lg font-semibold hover:bg-blue-100 transition"
                             >
                                 Explore Features
                             </a>
+
                         </div>
 
                         <div className="flex flex-wrap gap-5 mt-8 text-sm text-slate-600">
@@ -113,6 +100,7 @@ const Home = () => {
                                 <CheckCircle size={18} className="text-green-600" />
                                 Easy to use
                             </span>
+
                             <span className="flex items-center gap-2">
                                 <CheckCircle size={18} className="text-green-600" />
                                 All-in-one platform
@@ -123,6 +111,7 @@ const Home = () => {
                     {/* Hero Illustration */}
                     <div className="flex justify-center">
                         <div className="bg-white rounded-3xl shadow-xl p-8 md:p-12 w-full max-w-md">
+
                             <div className="bg-blue-100 w-24 h-24 rounded-2xl flex items-center justify-center mx-auto">
                                 <GraduationCap size={60} className="text-blue-600" />
                             </div>
@@ -137,6 +126,7 @@ const Home = () => {
                             </p>
 
                             <div className="grid grid-cols-2 gap-4 mt-8">
+
                                 <div className="bg-blue-50 rounded-xl p-4 text-center">
                                     <Users className="mx-auto text-blue-600" size={28} />
                                     <p className="font-semibold text-slate-700 mt-2">
@@ -164,6 +154,7 @@ const Home = () => {
                                         Subjects
                                     </p>
                                 </div>
+
                             </div>
                         </div>
                     </div>
@@ -220,6 +211,7 @@ const Home = () => {
             {/* About Section */}
             <section id="about" className="bg-slate-50 px-6 md:px-12 py-20">
                 <div className="max-w-4xl mx-auto text-center">
+
                     <h2 className="text-3xl md:text-4xl font-bold text-slate-900">
                         About EduTrack
                     </h2>
@@ -229,12 +221,14 @@ const Home = () => {
                         It brings student information, attendance records and academic
                         performance together in a single platform.
                     </p>
+
                 </div>
             </section>
 
             {/* Contact / CTA Section */}
             <section id="contact" className="px-6 md:px-12 py-20">
                 <div className="max-w-5xl mx-auto bg-blue-600 rounded-3xl p-10 md:p-16 text-center">
+
                     <h2 className="text-3xl md:text-4xl font-bold text-white">
                         Ready to Get Started?
                     </h2>
@@ -243,19 +237,21 @@ const Home = () => {
                         Join EduTrack and make student management simple.
                     </p>
 
-                    <Link
-                        to="/register"
+                    <button
+                        onClick={handleGetStarted}
                         className="inline-flex items-center gap-2 bg-white text-blue-600 px-7 py-3.5 rounded-lg font-semibold mt-8 hover:bg-blue-50 transition"
                     >
-                        Create Account
+                        Get Started
                         <ArrowRight size={20} />
-                    </Link>
+                    </button>
+
                 </div>
             </section>
 
             {/* Footer */}
             <footer className="bg-slate-900 text-white px-6 md:px-12 py-8">
                 <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+
                     <h2 className="text-xl font-bold">
                         Edu<span className="text-blue-400">Track</span>
                     </h2>
@@ -263,6 +259,7 @@ const Home = () => {
                     <p className="text-slate-400 text-sm">
                         © 2026 Edutrack. All rights reserved.
                     </p>
+
                 </div>
             </footer>
 

@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useState, useEffect, useMemo } from "react";
 
 import {
     CalendarDays,
@@ -7,74 +8,107 @@ import {
     UserX
 } from "lucide-react";
 
+const getToday = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+};
+
 const Attendance = () => {
 
-    const [selectedDate, setSelectedDate] = useState(
-        "2026-11-20"
-    );
+    const [selectedDate, setSelectedDate] = useState(getToday());
 
-    const [students, setStudents] = useState([
-        {
-            id: 1,
-            name: "Rahul Kumar",
-            rollNo: "101",
-            class: "10th",
-            status: "Present"
-        },
-        {
-            id: 2,
-            name: "Aman Sharma",
-            rollNo: "102",
-            class: "10th",
-            status: "Absent"
-        },
-        {
-            id: 3,
-            name: "Priya Singh",
-            rollNo: "103",
-            class: "10th",
-            status: "Present"
-        },
-        {
-            id: 4,
-            name: "Rohit Verma",
-            rollNo: "104",
-            class: "10th",
-            status: "Present"
-        },
-        {
-            id: 5,
-            name: "Ankit Kumar",
-            rollNo: "105",
-            class: "10th",
-            status: "Absent"
+    // Students added from Admin Dashboard
+    const [students, setStudents] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem("students")) || [];
+        } catch {
+            return [];
         }
-    ]);
+    });
 
-    // Calculate attendance
+    // Date-wise attendance records
+    const [attendanceRecords, setAttendanceRecords] = useState(() => {
+        try {
+            return JSON.parse(
+                localStorage.getItem("attendanceRecords")
+            ) || {};
+        } catch {
+            return {};
+        }
+    });
+
+    // Update students when Admin adds new students
+    useEffect(() => {
+        const loadStudents = () => {
+            try {
+                const savedStudents = JSON.parse(
+                    localStorage.getItem("students")
+                ) || [];
+
+                setStudents(savedStudents);
+            } catch {
+                setStudents([]);
+            }
+        };
+
+        window.addEventListener("storage", loadStudents);
+        window.addEventListener("studentsUpdated", loadStudents);
+
+        return () => {
+            window.removeEventListener("storage", loadStudents);
+            window.removeEventListener("studentsUpdated", loadStudents);
+        };
+    }, []);
+
+    // Save attendance records
+    useEffect(() => {
+        localStorage.setItem(
+            "attendanceRecords",
+            JSON.stringify(attendanceRecords)
+        );
+    }, [attendanceRecords]);
+
+    // Get attendance for selected date
+    const attendanceData = useMemo(() => {
+        const dateRecords = attendanceRecords[selectedDate] || {};
+
+        return students.map((student) => ({
+            ...student,
+            attendanceStatus: dateRecords[student.id] || "Not Marked"
+        }));
+    }, [students, attendanceRecords, selectedDate]);
+
+    // Calculate Statistics
     const totalStudents = students.length;
 
-    const presentStudents = students.filter(
-        (student) => student.status === "Present"
+    const presentStudents = attendanceData.filter(
+        (student) => student.attendanceStatus === "Present"
     ).length;
 
-    const absentStudents = students.filter(
-        (student) => student.status === "Absent"
+    const absentStudents = attendanceData.filter(
+        (student) => student.attendanceStatus === "Absent"
     ).length;
 
     const attendancePercentage = totalStudents
         ? Math.round((presentStudents / totalStudents) * 100)
         : 0;
 
-    // Update attendance
-    const updateAttendance = (id, status) => {
-        setStudents(
-            students.map((student) =>
-                student.id === id
-                    ? { ...student, status: status }
-                    : student
-            )
-        );
+    // Mark Attendance
+    const updateAttendance = (studentId, status) => {
+
+        setAttendanceRecords((prev) => ({
+            ...prev,
+
+            [selectedDate]: {
+                ...(prev[selectedDate] || {}),
+                [studentId]: status
+            }
+        }));
+
     };
 
     return (
@@ -95,14 +129,17 @@ const Attendance = () => {
 
                 {/* Date */}
                 <div className="flex items-center gap-2 bg-white border rounded-lg px-4 py-2">
+
                     <CalendarDays size={20} className="text-blue-600" />
 
                     <input
                         type="date"
                         value={selectedDate}
+                        max={getToday()}
                         onChange={(e) => setSelectedDate(e.target.value)}
                         className="outline-none text-slate-700"
                     />
+
                 </div>
 
             </div>
@@ -136,6 +173,7 @@ const Attendance = () => {
                         color: "bg-purple-100 text-purple-600"
                     }
                 ].map((item) => {
+
                     const Icon = item.icon;
 
                     return (
@@ -143,6 +181,7 @@ const Attendance = () => {
                             key={item.title}
                             className="bg-white p-6 rounded-xl shadow-sm border"
                         >
+
                             <div className="flex justify-between items-center">
 
                                 <div>
@@ -160,6 +199,7 @@ const Attendance = () => {
                                 </div>
 
                             </div>
+
                         </div>
                     );
                 })}
@@ -170,6 +210,7 @@ const Attendance = () => {
             <div className="bg-white rounded-xl shadow-sm border p-6">
 
                 <div className="mb-6">
+
                     <h2 className="text-xl font-bold text-slate-800">
                         Student Attendance
                     </h2>
@@ -177,6 +218,7 @@ const Attendance = () => {
                     <p className="text-sm text-slate-500 mt-1">
                         Mark students as present or absent.
                     </p>
+
                 </div>
 
                 <div className="overflow-x-auto">
@@ -185,74 +227,102 @@ const Attendance = () => {
 
                         <thead>
                             <tr className="border-b text-slate-500 text-sm">
+
                                 <th className="py-4">Roll No</th>
                                 <th className="py-4">Student Name</th>
                                 <th className="py-4">Class</th>
                                 <th className="py-4">Status</th>
                                 <th className="py-4">Action</th>
+
                             </tr>
                         </thead>
 
                         <tbody>
-                            {students.map((student) => (
 
-                                <tr
-                                    key={student.id}
-                                    className="border-b last:border-0"
-                                >
+                            {attendanceData.length > 0 ? (
 
-                                    <td className="py-4 text-slate-600">
-                                        {student.rollNo}
-                                    </td>
+                                attendanceData.map((student) => (
 
-                                    <td className="py-4 font-medium text-slate-800">
-                                        {student.name}
-                                    </td>
+                                    <tr
+                                        key={student.id}
+                                        className="border-b last:border-0"
+                                    >
 
-                                    <td className="py-4 text-slate-600">
-                                        {student.class}
-                                    </td>
+                                        <td className="py-4 text-slate-600">
+                                            {student.rollNo || student.id}
+                                        </td>
 
-                                    <td className="py-4">
-                                        <span
-                                            className={`px-3 py-1 rounded-full text-sm ${student.status === "Present"
-                                                    ? "bg-green-100 text-green-700"
-                                                    : "bg-red-100 text-red-700"
-                                                }`}
-                                        >
-                                            {student.status}
-                                        </span>
-                                    </td>
+                                        <td className="py-4 font-medium text-slate-800">
+                                            {student.name}
+                                        </td>
 
-                                    <td className="py-4">
+                                        <td className="py-4 text-slate-600">
+                                            {student.class || "-"}
+                                        </td>
 
-                                        <div className="flex gap-2">
+                                        <td className="py-4">
 
-                                            <button
-                                                onClick={() =>
-                                                    updateAttendance(student.id, "Present")
-                                                }
-                                                className="bg-green-100 text-green-700 px-3 py-2 rounded-lg text-sm hover:bg-green-200"
+                                            <span
+                                                className={`px-3 py-1 rounded-full text-sm ${student.attendanceStatus === "Present"
+                                                        ? "bg-green-100 text-green-700"
+                                                        : student.attendanceStatus === "Absent"
+                                                            ? "bg-red-100 text-red-700"
+                                                            : "bg-slate-100 text-slate-600"
+                                                    }`}
                                             >
-                                                Present
-                                            </button>
+                                                {student.attendanceStatus}
+                                            </span>
 
-                                            <button
-                                                onClick={() =>
-                                                    updateAttendance(student.id, "Absent")
-                                                }
-                                                className="bg-red-100 text-red-700 px-3 py-2 rounded-lg text-sm hover:bg-red-200"
-                                            >
-                                                Absent
-                                            </button>
+                                        </td>
 
-                                        </div>
+                                        <td className="py-4">
 
+                                            <div className="flex gap-2">
+
+                                                <button
+                                                    onClick={() =>
+                                                        updateAttendance(
+                                                            student.id,
+                                                            "Present"
+                                                        )
+                                                    }
+                                                    className="bg-green-100 text-green-700 px-3 py-2 rounded-lg text-sm hover:bg-green-200"
+                                                >
+                                                    Present
+                                                </button>
+
+                                                <button
+                                                    onClick={() =>
+                                                        updateAttendance(
+                                                            student.id,
+                                                            "Absent"
+                                                        )
+                                                    }
+                                                    className="bg-red-100 text-red-700 px-3 py-2 rounded-lg text-sm hover:bg-red-200"
+                                                >
+                                                    Absent
+                                                </button>
+
+                                            </div>
+
+                                        </td>
+
+                                    </tr>
+
+                                ))
+
+                            ) : (
+
+                                <tr>
+                                    <td
+                                        colSpan="5"
+                                        className="text-center py-12 text-slate-400"
+                                    >
+                                        No students available. Please add students from Admin Dashboard first.
                                     </td>
-
                                 </tr>
 
-                            ))}
+                            )}
 
                         </tbody>
 

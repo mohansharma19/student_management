@@ -1,5 +1,6 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
 import {
     Users,
     UserCheck,
@@ -20,52 +21,21 @@ const AdminDashboard = () => {
         class: ""
     });
 
-    const [students, setStudents] = useState([
-        {
-            id: 1,
-            name: "Rahul Kumar",
-            email: "rahul@gmail.com",
-            class: "10th",
-            status: "Active"
-        },
-        {
-            id: 2,
-            name: "Aman Sharma",
-            email: "aman@gmail.com",
-            class: "12th",
-            status: "Active"
-        },
-        {
-            id: 3,
-            name: "Priya Singh",
-            email: "priya@gmail.com",
-            class: "11th",
-            status: "Active"
-        },
-        {
-            id: 4,
-            name: "Rohit Verma",
-            email: "rohit@gmail.com",
-            class: "10th",
-            status: "Active"
-        },
-
-        {
-            id: 5,
-            name: "Sneha Sharma ",
-            email: "sneha@gmail.com",
-            class: "11th",
-            status: "Active"
-        },
-        {
-            id: 6,
-            name: "Mohit singh",
-            email: "Mohit@gmail.com",
-            class: "12th",
-            status: "Active"
+    // Load only user-added students
+    const [students, setStudents] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem("students")) || [];
+        } catch {
+            return [];
         }
-    ]);
+    });
 
+    // Save students whenever data changes
+    useEffect(() => {
+        localStorage.setItem("students", JSON.stringify(students));
+    }, [students]);
+
+    // Dynamic Statistics
     const stats = [
         {
             title: "Total Students",
@@ -75,19 +45,25 @@ const AdminDashboard = () => {
         },
         {
             title: "Present Today",
-            value: "220",
+            value: students.filter(
+                student => student.status === "Present"
+            ).length,
             icon: UserCheck,
             color: "bg-green-100 text-green-600"
         },
         {
             title: "Absent Today",
-            value: "30",
+            value: students.filter(
+                student => student.status === "Absent"
+            ).length,
             icon: UserX,
             color: "bg-red-100 text-red-600"
         },
         {
             title: "Total Classes",
-            value: "12",
+            value: new Set(
+                students.map(student => student.class)
+            ).size,
             icon: BookOpen,
             color: "bg-purple-100 text-purple-600"
         }
@@ -103,22 +79,24 @@ const AdminDashboard = () => {
     const handleSubmit = (e) => {
         e.preventDefault();
 
-        if (!formData.name.trim() ||
+        if (
+            !formData.name.trim() ||
             !formData.email.trim() ||
-            !formData.class.trim()) {
+            !formData.class.trim()
+        ) {
             alert("Please fill all fields");
             return;
         }
 
         const newStudent = {
             id: Date.now(),
-            name: formData.name,
-            email: formData.email,
-            class: formData.class,
+            name: formData.name.trim(),
+            email: formData.email.trim(),
+            class: formData.class.trim(),
             status: "Active"
         };
 
-        setStudents([...students, newStudent]);
+        setStudents(prev => [...prev, newStudent]);
 
         setFormData({
             name: "",
@@ -279,11 +257,6 @@ const AdminDashboard = () => {
                         </p>
                     </div>
 
-                    <button className="text-blue-600 font-medium flex items-center gap-1">
-                        View All
-                        <ArrowUpRight size={18} />
-                    </button>
-
                 </div>
 
                 <div className="overflow-x-auto">
@@ -301,32 +274,41 @@ const AdminDashboard = () => {
 
                         <tbody>
 
-                            {students.map((student) => (
-                                <tr
-                                    key={student.id}
-                                    className="border-b last:border-0"
-                                >
+                            {students.length > 0 ? (
+                                students.map((student) => (
+                                    <tr
+                                        key={student.id}
+                                        className="border-b last:border-0"
+                                    >
+                                        <td className="py-4 font-medium text-slate-800">
+                                            {student.name}
+                                        </td>
 
-                                    <td className="py-4 font-medium text-slate-800">
-                                        {student.name}
+                                        <td className="py-4 text-slate-500">
+                                            {student.email}
+                                        </td>
+
+                                        <td className="py-4 text-slate-600">
+                                            {student.class}
+                                        </td>
+
+                                        <td className="py-4">
+                                            <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm">
+                                                {student.status}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td
+                                        colSpan="4"
+                                        className="text-center py-10 text-slate-400"
+                                    >
+                                        No students added yet. Click Add Student to get started.
                                     </td>
-
-                                    <td className="py-4 text-slate-500">
-                                        {student.email}
-                                    </td>
-
-                                    <td className="py-4 text-slate-600">
-                                        {student.class}
-                                    </td>
-
-                                    <td className="py-4">
-                                        <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">
-                                            {student.status}
-                                        </span>
-                                    </td>
-
                                 </tr>
-                            ))}
+                            )}
 
                         </tbody>
 

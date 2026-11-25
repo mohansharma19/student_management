@@ -1,34 +1,50 @@
 const mongoose = require("mongoose");
+
 const userSchema = new mongoose.Schema(
     {
-        // name requirement for authentication 
         name: {
             type: String,
-            required: true,
+            required: [true, "Name is required"],
             trim: true,
         },
-         // email requirement for authentication 
+
         email: {
             type: String,
-            required: true,
+            required: [true, "Email is required"],
             unique: true,
             lowercase: true,
             trim: true,
         },
 
-        // password requirement for authentication 
         password: {
             type: String,
-            required: true,
+            required: [true, "Password is required"],
+            minlength: 6,
+            select: false,
         },
-        // role based on authentication 
+
         role: {
             type: String,
             enum: ["admin", "student"],
             default: "student",
         },
 
+        isEmailVerified: {
+            type: Boolean,
+            default: false,
+        },
 
+        emailVerificationTokenHash: {
+            type: String,
+            default: null,
+            select: false,
+        },
+
+        emailVerificationTokenExpires: {
+            type: Date,
+            default: null,
+            select: false,
+        },
     },
     {
         timestamps: true,
@@ -36,4 +52,5 @@ const userSchema = new mongoose.Schema(
 );
 
 const User = mongoose.model("User", userSchema);
+
 module.exports = User;

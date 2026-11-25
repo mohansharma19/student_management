@@ -1,8 +1,10 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
+const sendEmail = require("../utils/sendEmail");
 
-// Generate JWT Token
+// Generate JWT
 const generateToken = (id) => {
     return jwt.sign(
         { id },
@@ -14,50 +16,176 @@ const generateToken = (id) => {
 // REGISTER USER
 const registerUser = async (req, res) => {
     try {
-        const { name, email, password, role } = req.body;
+        const { name, email, password } = req.body;
 
-        // Check required fields
         if (!name || !email || !password) {
             return res.status(400).json({
+                success: false,
                 message: "Please fill all required fields",
             });
         }
 
-        // Check existing user
-        const existingUser = await User.findOne({ email });
-
-        if (existingUser) {
-            return res.status(409).json({
-                message: "User already exists",
+        if (password.length < 6) {
+            return res.status(400).json({
+                success: false,
+                message: "Password must be at least 6 characters",
             });
         }
 
-        // Hash password
+        const frontendURL = process.env.FRONTEND_URL;
+
+        if (!frontendURL || !process.env.JWT_SECRET) {
+            return res.status(500).json({
+                success: false,
+                message: "Server configuration is missing",
+            });
+        }
+
+        const normalizedEmail = email.toLowerCase().trim();
+
+        const existingUser = await User.findOne({
+            email: normalizedEmail,
+        });
+
+        if (existingUser) {
+            return res.status(409).json({
+                success: false,
+                message: existingUser.isEmailVerified
+                    ? "User already exists"
+                    : "Account already exists but email is not verified. Please contact support or request a new verification email.",
+            });
+        }
+
         const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Generate verification token
+        const verificationToken = crypto
+            .randomBytes(32)
+            .toString("hex");
+
+        const hashedToken = crypto
+            .createHash("sha256")
+            .update(verificationToken)
+            .digest("hex");
 
         // Create user
         const user = await User.create({
-            name,
-            email,
+            name: name.trim(),
+            email: normalizedEmail,
             password: hashedPassword,
-            role: role === "admin" ? "admin" : "student",
+            role: "student",
+            isEmailVerified: false,
+            emailVerificationTokenHash: hashedToken,
+            emailVerificationTokenExpires: new Date(
+                Date.now() + 10 * 60 * 1000
+            ),
         });
 
-        res.status(201).json({
-            message: "Registration successful",
-            token: generateToken(user._id),
-            user: {
-                id: user._id,
-                name: user.name,
-                email: user.email,
-                role: user.role,
-            },
+        const verificationLink =
+            `${frontendURL.replace(/\/$/, "")}/verify-email?token=${verificationToken}`;
+
+        try {
+            await sendEmail(
+                user.email,
+                "Verify Your EduTrack Account",
+                `
+                <div style="font-family: Arial; padding: 20px;">
+                    <h2>Hello ${user.name}!</h2>
+
+                    <p>Thank you for registering with EduTrack.</p>
+
+                    <p>Please verify your email address by clicking below:</p>
+
+                    <a href="${verificationLink}"
+                       style="
+                           background: #2563eb;
+                           color: white;
+                           padding: 12px 20px;
+                           text-decoration: none;
+                           border-radius: 6px;
+                           display: inline-block;
+                       ">
+                        Verify Email
+                    </a>
+
+                    <p>This link expires in 10 minutes.</p>
+
+                    <p>If you did not create this account, ignore this email.</p>
+                </div>
+                `
+            );
+
+        } catch (emailError) {
+            // Remove user if verification email fails
+            await User.findByIdAndDelete(user._id);
+            throw emailError;
+        }
+
+        return res.status(201).json({
+            success: true,
+            message: "Registration successful. Please check your email to verify your account.",
         });
 
     } catch (error) {
-        res.status(500).json({
-            message: "Registration failed",
-            error: error.message,
+        console.error("REGISTER ERROR:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Registration failed. Please try again.",
+        });
+    }
+};
+
+// VERIFY EMAIL
+const verifyEmail = async (req, res) => {
+    try {
+        const { token } = req.query;
+
+        if (!token) {
+            return res.status(400).json({
+                success: false,
+                message: "Verification token is missing",
+            });
+        }
+
+        const hashedToken = crypto
+            .createHash("sha256")
+            .update(token)
+            .digest("hex");
+
+        const user = await User.findOne({
+            emailVerificationTokenHash: hashedToken,
+            emailVerificationTokenExpires: {
+                $gt: new Date(),
+            },
+        }).select(
+            "+emailVerificationTokenHash +emailVerificationTokenExpires"
+        );
+
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid or expired verification link",
+            });
+        }
+
+        user.isEmailVerified = true;
+        user.emailVerificationTokenHash = null;
+        user.emailVerificationTokenExpires = null;
+
+        await user.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Email verified successfully. You can now login.",
+        });
+
+    } catch (error) {
+        console.error("VERIFY EMAIL ERROR:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Email verification failed",
         });
     }
 };
@@ -69,20 +197,24 @@ const loginUser = async (req, res) => {
 
         if (!email || !password) {
             return res.status(400).json({
+                success: false,
                 message: "Please enter email and password",
             });
         }
 
-        // Find user
-        const user = await User.findOne({ email });
+        const normalizedEmail = email.toLowerCase().trim();
+
+        const user = await User.findOne({
+            email: normalizedEmail,
+        }).select("+password");
 
         if (!user) {
             return res.status(401).json({
+                success: false,
                 message: "Invalid email or password",
             });
         }
 
-        // Compare password
         const isMatch = await bcrypt.compare(
             password,
             user.password
@@ -90,13 +222,26 @@ const loginUser = async (req, res) => {
 
         if (!isMatch) {
             return res.status(401).json({
+                success: false,
                 message: "Invalid email or password",
             });
         }
 
-        res.status(200).json({
+        // Check email verification
+        if (!user.isEmailVerified) {
+            return res.status(403).json({
+                success: false,
+                message: "Please verify your email before logging in.",
+            });
+        }
+
+        // Generate JWT after successful login
+        const authToken = generateToken(user._id);
+
+        return res.status(200).json({
+            success: true,
             message: "Login successful",
-            token: generateToken(user._id),
+            token: authToken,
             user: {
                 id: user._id,
                 name: user.name,
@@ -106,30 +251,44 @@ const loginUser = async (req, res) => {
         });
 
     } catch (error) {
-        res.status(500).json({
+        console.error("LOGIN ERROR:", error);
+
+        return res.status(500).json({
+            success: false,
             message: "Login failed",
-            error: error.message,
         });
     }
 };
 
-// GET LOGGED-IN USER PROFILE
+// GET LOGGED-IN USER
 const getMe = async (req, res) => {
     try {
-        const user = await User.findById(req.user.id).select("-password");
+        const user = await User.findById(req.user.id);
 
         if (!user) {
             return res.status(404).json({
+                success: false,
                 message: "User not found",
             });
         }
 
-        res.status(200).json(user);
+        return res.status(200).json({
+            success: true,
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                isEmailVerified: user.isEmailVerified,
+            },
+        });
 
     } catch (error) {
-        res.status(500).json({
+        console.error("GET ME ERROR:", error);
+
+        return res.status(500).json({
+            success: false,
             message: "Failed to get profile",
-            error: error.message,
         });
     }
 };
@@ -137,5 +296,6 @@ const getMe = async (req, res) => {
 module.exports = {
     registerUser,
     loginUser,
+    verifyEmail,
     getMe,
 };

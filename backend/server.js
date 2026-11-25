@@ -2,36 +2,48 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
-// Import Database Connection
+// Import database connection
 const connectDB = require("./config/db");
 
-// Import Auth Routes
+// Import routes
 const authRoute = require("./routes/authRoute");
+const studentRoute = require("./routes/studentRoute");
 
 const app = express();
 
-// Middlewares
-app.use(cors());
+// middleware
+app.use(cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+}));
+
 app.use(express.json());
 
-// Test API
+// home routes 
+
 app.get("/", (req, res) => {
-    res.status(200).send("EduTrack backend is running");
+    res.send("EduTrack backend is running");
 });
 
-// Authentication Routes
+
+
+// Authentication APIs
 app.use("/api/auth", authRoute);
 
-// Server Port
+// Student Management APIs
+app.use("/api/students", studentRoute);
+
+// server configuration 
+
 const PORT = process.env.PORT || 5000;
 
-// Connect Database and Start Server
-const databaseConnection = async () => {
+// Start server after database connection
+const startServer = async () => {
     try {
         await connectDB();
 
-        app.listen(PORT, "127.0.0.1", () => {
-            console.log(`Server is running at http://localhost:${PORT}`);
+        app.listen(PORT, () => {
+            console.log(`Server running on http://localhost:${PORT}`);
         });
 
     } catch (error) {
@@ -40,5 +52,4 @@ const databaseConnection = async () => {
     }
 };
 
-// Start Application
-databaseConnection();
+startServer();

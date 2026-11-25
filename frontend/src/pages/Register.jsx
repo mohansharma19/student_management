@@ -1,7 +1,72 @@
+import { useState } from "react";
 import { GraduationCap, User, Mail, Lock } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useRegister } from "../hooks/useAuth";
 
 const Register = () => {
+    const registerMutation = useRegister();
+
+    const [formData, setFormData] = useState({
+        name: "",
+        email: "",
+        password: "",
+        confirmPassword: "",
+    });
+
+    const [message, setMessage] = useState("");
+    const [error, setError] = useState("");
+    const [registered, setRegistered] = useState(false);
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+
+        setFormData((prev) => ({
+            ...prev,
+            [name]: value,
+        }));
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+
+        setMessage("");
+        setError("");
+
+        if (formData.password !== formData.confirmPassword) {
+            setError("Passwords do not match");
+            return;
+        }
+
+        if (formData.password.length < 6) {
+            setError("Password must be at least 6 characters");
+            return;
+        }
+
+        registerMutation.mutate(
+            {
+                name: formData.name.trim(),
+                email: formData.email.trim(),
+                password: formData.password,
+            },
+            {
+                onSuccess: (data) => {
+                    setMessage(
+                        data.message ||
+                        "Registration successful. Please verify your email."
+                    );
+
+                    setRegistered(true);
+                },
+                onError: (err) => {
+                    setError(
+                        err.response?.data?.message ||
+                        "Registration failed. Please try again."
+                    );
+                },
+            }
+        );
+    };
+
     return (
         <div className="min-h-screen bg-blue-50 flex items-center justify-center p-6">
 
@@ -42,106 +107,152 @@ const Register = () => {
                         Fill in your details to get started.
                     </p>
 
-                    <form className="space-y-4">
+                    {/* Success Message */}
+                    {message && (
+                        <div className="bg-green-100 text-green-700 p-4 rounded-lg mb-4">
+                            <p className="font-semibold">
+                                Registration Successful!
+                            </p>
 
-                        {/* Full Name */}
-                        <div>
-                            <label className="block mb-2 font-medium">
-                                Full Name
-                            </label>
+                            <p className="mt-2 text-sm">
+                                {message}
+                            </p>
 
-                            <div className="flex items-center border rounded-lg px-3">
-                                <User size={20} className="text-slate-400" />
+                            <p className="mt-2 text-sm">
+                                Please check your inbox and spam folder
+                                to verify your email address.
+                            </p>
+                        </div>
+                    )}
 
-                                <input
-                                    type="text"
-                                    placeholder="Enter your name"
-                                    className="w-full p-3 outline-none"
-                                />
+                    {/* Error Message */}
+                    {error && (
+                        <div className="bg-red-100 text-red-700 p-3 rounded-lg mb-4">
+                            {error}
+                        </div>
+                    )}
+
+                    {!registered && (
+                        <form onSubmit={handleSubmit} className="space-y-4">
+
+                            {/* Full Name */}
+                            <div>
+                                <label className="block mb-2 font-medium">
+                                    Full Name
+                                </label>
+
+                                <div className="flex items-center border rounded-lg px-3">
+                                    <User size={20} className="text-slate-400" />
+
+                                    <input
+                                        type="text"
+                                        name="name"
+                                        value={formData.name}
+                                        onChange={handleChange}
+                                        placeholder="Enter your name"
+                                        className="w-full p-3 outline-none"
+                                        required
+                                    />
+                                </div>
                             </div>
-                        </div>
 
-                        {/* Email */}
-                        <div>
-                            <label className="block mb-2 font-medium">
-                                Email Address
-                            </label>
+                            {/* Email */}
+                            <div>
+                                <label className="block mb-2 font-medium">
+                                    Email Address
+                                </label>
 
-                            <div className="flex items-center border rounded-lg px-3">
-                                <Mail size={20} className="text-slate-400" />
+                                <div className="flex items-center border rounded-lg px-3">
+                                    <Mail size={20} className="text-slate-400" />
 
-                                <input
-                                    type="email"
-                                    placeholder="Enter your email"
-                                    className="w-full p-3 outline-none"
-                                />
+                                    <input
+                                        type="email"
+                                        name="email"
+                                        value={formData.email}
+                                        onChange={handleChange}
+                                        placeholder="Enter your email"
+                                        className="w-full p-3 outline-none"
+                                        required
+                                    />
+                                </div>
                             </div>
-                        </div>
 
-                        {/* Password */}
-                        <div>
-                            <label className="block mb-2 font-medium">
-                                Password
-                            </label>
+                            {/* Password */}
+                            <div>
+                                <label className="block mb-2 font-medium">
+                                    Password
+                                </label>
 
-                            <div className="flex items-center border rounded-lg px-3">
-                                <Lock size={20} className="text-slate-400" />
+                                <div className="flex items-center border rounded-lg px-3">
+                                    <Lock size={20} className="text-slate-400" />
 
-                                <input
-                                    type="password"
-                                    placeholder="Create password"
-                                    className="w-full p-3 outline-none"
-                                />
+                                    <input
+                                        type="password"
+                                        name="password"
+                                        value={formData.password}
+                                        onChange={handleChange}
+                                        placeholder="Create password"
+                                        className="w-full p-3 outline-none"
+                                        required
+                                    />
+                                </div>
                             </div>
-                        </div>
 
-                        {/* Confirm Password */}
-                        <div>
-                            <label className="block mb-2 font-medium">
-                                Confirm Password
-                            </label>
+                            {/* Confirm Password */}
+                            <div>
+                                <label className="block mb-2 font-medium">
+                                    Confirm Password
+                                </label>
 
-                            <div className="flex items-center border rounded-lg px-3">
-                                <Lock size={20} className="text-slate-400" />
+                                <div className="flex items-center border rounded-lg px-3">
+                                    <Lock size={20} className="text-slate-400" />
 
-                                <input
-                                    type="password"
-                                    placeholder="Confirm password"
-                                    className="w-full p-3 outline-none"
-                                />
+                                    <input
+                                        type="password"
+                                        name="confirmPassword"
+                                        value={formData.confirmPassword}
+                                        onChange={handleChange}
+                                        placeholder="Confirm password"
+                                        className="w-full p-3 outline-none"
+                                        required
+                                    />
+                                </div>
                             </div>
-                        </div>
 
-                        {/* Role */}
-                        <div>
-                            <label className="block mb-2 font-medium">
-                                Register As
-                            </label>
+                            <button
+                                type="submit"
+                                disabled={registerMutation.isPending}
+                                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                                {registerMutation.isPending
+                                    ? "Creating Account..."
+                                    : "Create Account"}
+                            </button>
 
-                            <select className="w-full border rounded-lg p-3 outline-none">
-                                <option value="student">Student</option>
-                                <option value="admin">Admin</option>
-                            </select>
-                        </div>
+                        </form>
+                    )}
 
-                        <button
-                            type="submit"
-                            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition"
-                        >
-                            Create Account
-                        </button>
-
-                    </form>
-
-                    <p className="text-center mt-5 text-slate-500">
-                        Already have an account?
+                    {registered && (
                         <Link
                             to="/login"
-                            className="text-blue-600 font-semibold ml-1 hover:underline"
+                            className="text-center bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700"
                         >
-                            Login
+                            Go to Login
                         </Link>
-                    </p>
+                    )}
+
+                    {!registered && (
+                        <p className="text-center mt-5 text-slate-500">
+                            Already have an account?
+
+                            <Link
+                                to="/login"
+                                className="text-blue-600 font-semibold ml-1 hover:underline"
+                            >
+                                Login
+                            </Link>
+                        </p>
+                    )}
 
                 </div>
 
