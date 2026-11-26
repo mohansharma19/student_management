@@ -8,7 +8,9 @@ const connectDB = require("./config/db");
 // Import routes
 const authRoute = require("./routes/authRoute");
 const studentRoute = require("./routes/studentRoute");
-
+const attendanceRoute = require("./routes/attendanceRoute");
+const marksRoute = require("./routes/marksRoute");
+const dailyReportRoutes = require("./routes/dailyReportRoute");
 const app = express();
 
 // middleware
@@ -32,6 +34,12 @@ app.use("/api/auth", authRoute);
 
 // Student Management APIs
 app.use("/api/students", studentRoute);
+
+app.use("/api/attendance", attendanceRoute);
+
+app.use("/api/marks", marksRoute);
+
+app.use("/api/daily-reports", dailyReportRoutes);
 
 // server configuration 
 

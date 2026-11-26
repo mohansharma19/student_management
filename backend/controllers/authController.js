@@ -1,3 +1,4 @@
+
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -13,7 +14,7 @@ const generateToken = (id) => {
     );
 };
 
-// REGISTER USER
+// REGISTER USER (Student only)
 const registerUser = async (req, res) => {
     try {
         const { name, email, password } = req.body;
@@ -32,9 +33,7 @@ const registerUser = async (req, res) => {
             });
         }
 
-        const frontendURL = process.env.FRONTEND_URL;
-
-        if (!frontendURL || !process.env.JWT_SECRET) {
+        if (!process.env.FRONTEND_URL || !process.env.JWT_SECRET) {
             return res.status(500).json({
                 success: false,
                 message: "Server configuration is missing",
@@ -50,25 +49,19 @@ const registerUser = async (req, res) => {
         if (existingUser) {
             return res.status(409).json({
                 success: false,
-                message: existingUser.isEmailVerified
-                    ? "User already exists"
-                    : "Account already exists but email is not verified. Please contact support or request a new verification email.",
+                message: "Email already registered",
             });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Generate verification token
-        const verificationToken = crypto
-            .randomBytes(32)
-            .toString("hex");
+        const verificationToken = crypto.randomBytes(32).toString("hex");
 
         const hashedToken = crypto
             .createHash("sha256")
             .update(verificationToken)
             .digest("hex");
 
-        // Create user
         const user = await User.create({
             name: name.trim(),
             email: normalizedEmail,
@@ -82,7 +75,7 @@ const registerUser = async (req, res) => {
         });
 
         const verificationLink =
-            `${frontendURL.replace(/\/$/, "")}/verify-email?token=${verificationToken}`;
+            `${process.env.FRONTEND_URL.replace(/\/$/, "")}/verify-email?token=${verificationToken}`;
 
         try {
             await sendEmail(
@@ -91,39 +84,21 @@ const registerUser = async (req, res) => {
                 `
                 <div style="font-family: Arial; padding: 20px;">
                     <h2>Hello ${user.name}!</h2>
-
                     <p>Thank you for registering with EduTrack.</p>
-
-                    <p>Please verify your email address by clicking below:</p>
-
-                    <a href="${verificationLink}"
-                       style="
-                           background: #2563eb;
-                           color: white;
-                           padding: 12px 20px;
-                           text-decoration: none;
-                           border-radius: 6px;
-                           display: inline-block;
-                       ">
-                        Verify Email
-                    </a>
-
+                    <p>Click below to verify your email:</p>
+                    <a href="${verificationLink}">Verify Email</a>
                     <p>This link expires in 10 minutes.</p>
-
-                    <p>If you did not create this account, ignore this email.</p>
                 </div>
                 `
             );
-
         } catch (emailError) {
-            // Remove user if verification email fails
             await User.findByIdAndDelete(user._id);
             throw emailError;
         }
 
         return res.status(201).json({
             success: true,
-            message: "Registration successful. Please check your email to verify your account.",
+            message: "Registration successful. Please verify your email.",
         });
 
     } catch (error) {
@@ -131,7 +106,7 @@ const registerUser = async (req, res) => {
 
         return res.status(500).json({
             success: false,
-            message: "Registration failed. Please try again.",
+            message: "Registration failed",
         });
     }
 };
@@ -155,12 +130,8 @@ const verifyEmail = async (req, res) => {
 
         const user = await User.findOne({
             emailVerificationTokenHash: hashedToken,
-            emailVerificationTokenExpires: {
-                $gt: new Date(),
-            },
-        }).select(
-            "+emailVerificationTokenHash +emailVerificationTokenExpires"
-        );
+            emailVerificationTokenExpires: { $gt: new Date() },
+        });
 
         if (!user) {
             return res.status(400).json({
@@ -190,7 +161,9 @@ const verifyEmail = async (req, res) => {
     }
 };
 
-// LOGIN USER
+// LOGIN USER (Admin + Student)
+
+// LOGIN USER (Admin + Student)
 const loginUser = async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -202,23 +175,37 @@ const loginUser = async (req, res) => {
             });
         }
 
-        const normalizedEmail = email.toLowerCase().trim();
+        if (!process.env.JWT_SECRET) {
+            return res.status(500).json({
+                success: false,
+                message: "JWT secret is missing",
+            });
+        }
 
+        const normalizedEmail = email.trim().toLowerCase();
+
+        // Find user and include password
         const user = await User.findOne({
             email: normalizedEmail,
         }).select("+password");
 
         if (!user) {
+            console.log("RESULT: User not found");
+
+
             return res.status(401).json({
                 success: false,
                 message: "Invalid email or password",
             });
         }
 
+
+        // Compare password
         const isMatch = await bcrypt.compare(
             password,
             user.password
         );
+
 
         if (!isMatch) {
             return res.status(401).json({
@@ -227,7 +214,6 @@ const loginUser = async (req, res) => {
             });
         }
 
-        // Check email verification
         if (!user.isEmailVerified) {
             return res.status(403).json({
                 success: false,
@@ -235,13 +221,13 @@ const loginUser = async (req, res) => {
             });
         }
 
-        // Generate JWT after successful login
-        const authToken = generateToken(user._id);
+        // Generate JWT
+        const token = generateToken(user._id);
 
         return res.status(200).json({
             success: true,
             message: "Login successful",
-            token: authToken,
+            token,
             user: {
                 id: user._id,
                 name: user.name,
@@ -256,6 +242,7 @@ const loginUser = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Login failed",
+            error: error.message,
         });
     }
 };
