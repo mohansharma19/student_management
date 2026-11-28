@@ -31,7 +31,6 @@ const Login = () => {
                 onSuccess: (data) => {
                     console.log("Login Response:", data);
 
-                    // Check backend response
                     if (!data?.token || !data?.user) {
                         console.error("Token or User missing:", data);
                         setMessage("Invalid login response from server.");
@@ -48,12 +47,27 @@ const Login = () => {
                     );
 
                     // Update Navbar and Sidebar
-                    window.dispatchEvent(
-                        new Event("authChanged")
-                    );
+                    window.dispatchEvent(new Event("authChanged"));
 
-                    // Redirect to Home Page
-                    navigate("/", { replace: true });
+                    // Role Based Dashboard Redirect
+                    const role = data.user.role?.toLowerCase();
+
+                    if (role === "admin") {
+                        navigate("/admin/dashboard", {
+                            replace: true,
+                        });
+                    } else if (role === "student") {
+                        navigate("/student/dashboard", {
+                            replace: true,
+                        });
+                    } else {
+                        localStorage.removeItem("token");
+                        localStorage.removeItem("user");
+
+                        setMessage(
+                            `Invalid user role: ${data.user.role || "Unknown"}`
+                        );
+                    }
                 },
 
                 onError: (error) => {

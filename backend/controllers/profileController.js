@@ -4,7 +4,6 @@ const bcrypt = require("bcryptjs");
 
 // ==========================================
 // 1. GET MY PROFILE
-// Admin / Student apni profile dekh sakte hain
 // ==========================================
 
 const getMyProfile = async (req, res) => {
@@ -21,7 +20,6 @@ const getMyProfile = async (req, res) => {
 
         let studentProfile = null;
 
-        // Agar logged-in user student hai
         if (user.role === "student") {
             studentProfile = await Student.findOne({
                 user: user._id,
@@ -48,7 +46,6 @@ const getMyProfile = async (req, res) => {
 
 // ==========================================
 // 2. UPDATE MY PROFILE
-// User apni allowed profile details update karega
 // ==========================================
 
 const updateMyProfile = async (req, res) => {
@@ -73,18 +70,16 @@ const updateMyProfile = async (req, res) => {
             });
         }
 
-        // Common user profile fields
+        // Common user fields
         if (name !== undefined) user.name = name;
         if (phone !== undefined) user.phone = phone;
         if (profileImage !== undefined) {
             user.profileImage = profileImage;
         }
 
-        await user.save();
-
         let studentProfile = null;
 
-        // Student-specific profile fields
+        // Student-specific fields
         if (user.role === "student") {
             studentProfile = await Student.findOne({
                 user: user._id,
@@ -93,8 +88,12 @@ const updateMyProfile = async (req, res) => {
             if (!studentProfile) {
                 return res.status(404).json({
                     success: false,
-                    message: "Student profile not found",
+                    message: "Student profile not found. Please contact admin to link your student record.",
                 });
+            }
+
+            if (phone !== undefined) {
+                studentProfile.phone = phone;
             }
 
             if (address !== undefined) {
@@ -120,11 +119,16 @@ const updateMyProfile = async (req, res) => {
             await studentProfile.save();
         }
 
+        await user.save();
+
+        const updatedUser = await User.findById(user._id)
+            .select("-password");
+
         return res.status(200).json({
             success: true,
             message: "Profile updated successfully",
             data: {
-                user: await User.findById(user._id).select("-password"),
+                user: updatedUser,
                 studentProfile,
             },
         });
@@ -140,14 +144,12 @@ const updateMyProfile = async (req, res) => {
 
 // ==========================================
 // 3. CHANGE PASSWORD
-// User apna password change karega
 // ==========================================
 
 const changePassword = async (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body;
 
-        // Required fields check
         if (!currentPassword || !newPassword) {
             return res.status(400).json({
                 success: false,
@@ -162,7 +164,6 @@ const changePassword = async (req, res) => {
             });
         }
 
-        // Password select:false hai, isliye explicitly select karna hoga
         const user = await User.findById(req.user.id)
             .select("+password");
 
@@ -173,7 +174,6 @@ const changePassword = async (req, res) => {
             });
         }
 
-        // Verify current password
         const isMatch = await bcrypt.compare(
             currentPassword,
             user.password
@@ -186,9 +186,7 @@ const changePassword = async (req, res) => {
             });
         }
 
-        // Hash new password
         user.password = await bcrypt.hash(newPassword, 10);
-
         await user.save();
 
         return res.status(200).json({
@@ -206,15 +204,13 @@ const changePassword = async (req, res) => {
 
 
 // ==========================================
-// 4. GET STUDENT PROFILE
-// Only Admin can view a student's profile
+// 4. GET STUDENT PROFILE (ADMIN)
 // ==========================================
 
 const getStudentProfile = async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Find student and populate user details
         const student = await Student.findById(id)
             .populate(
                 "user",
@@ -244,7 +240,7 @@ const getStudentProfile = async (req, res) => {
 
 
 // ==========================================
-// EXPORT ALL FUNCTIONS
+// EXPORT
 // ==========================================
 
 module.exports = {

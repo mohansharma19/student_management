@@ -1,110 +1,114 @@
+
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
-
-// 1. PROTECT MIDDLEWARE
-// Verify JWT token and authenticate user
-
-
+// ======================================
+// PROTECT MIDDLEWARE
+// ======================================
 const protect = async (req, res, next) => {
     try {
-        let token;
+        const authHeader = req.headers.authorization;
 
-        // Check Authorization header for Bearer token
-        if (
-            req.headers.authorization &&
-            req.headers.authorization.startsWith("Bearer ")
-        ) {
-            token = req.headers.authorization.split(" ")[1];
-        }
-
-        // If token is missing, deny access
-        if (!token) {
+        // Check token
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
             return res.status(401).json({
                 success: false,
-                message: "Authentication token missing",
+                message: "Authentication token missing. Please login.",
             });
         }
 
-        // Verify JWT token using secret key
+        const token = authHeader.split(" ")[1];
+
+        if (!token) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid authentication token",
+            });
+        }
+
+        // Verify JWT
         const decoded = jwt.verify(
             token,
             process.env.JWT_SECRET
         );
 
-        // Find logged-in user in database
+        if (!decoded.id) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid token payload",
+            });
+        }
+
+        // Find user
         const user = await User.findById(decoded.id).select("-password");
 
-        // Check whether user exists
         if (!user) {
             return res.status(401).json({
                 success: false,
-                message: "User not found",
+                message: "User not found. Please login again.",
             });
         }
 
-        // Check email verification status
-        if (!user.isEmailVerified) {
+        // Email verification
+        if (user.isEmailVerified !== true) {
             return res.status(403).json({
                 success: false,
-                message: "Please verify your email first",
+                message: "Please verify your email first.",
             });
         }
 
-        // Store authenticated user details in request
+        // Attach user
         req.user = {
-            id: user._id,
+            id: user._id.toString(),
             name: user.name,
             email: user.email,
             role: user.role,
         };
 
-        // Continue to next middleware or controller
         next();
 
     } catch (error) {
+        console.error("Auth Middleware Error:", error.message);
+
         return res.status(401).json({
             success: false,
-            message: "Invalid or expired token",
+            message:
+                error.name === "TokenExpiredError"
+                    ? "Session expired. Please login again."
+                    : "Invalid or expired authentication token.",
         });
     }
 };
 
-
-
-// 2. AUTHORIZE MIDDLEWARE
-// Check whether user has permission
-
+// ======================================
+// AUTHORIZE MIDDLEWARE
+// ======================================
 const authorize = (...roles) => {
-
     return (req, res, next) => {
 
-        // Check whether user is authenticated
         if (!req.user) {
             return res.status(401).json({
                 success: false,
-                message: "Please login first",
+                message: "Please login first.",
             });
         }
 
-        // Check whether user's role is allowed
         if (!roles.includes(req.user.role)) {
             return res.status(403).json({
                 success: false,
-                message: "Access denied. You don't have permission",
+                message: "Access denied. Insufficient permissions.",
+                userRole: req.user.role,
+                allowedRoles: roles,
             });
         }
 
-        // User has permission, continue
         next();
     };
 };
 
-
-
-// EXPORT MIDDLEWARE FUNCTIONS
-
-
+// ======================================
+// EXPORT
+// ======================================
 module.exports = {
     protect,
     authorize,

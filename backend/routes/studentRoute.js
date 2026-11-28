@@ -1,35 +1,28 @@
+
 const express = require("express");
 const router = express.Router();
 
-// Import authentication middleware
 const { protect, authorize } = require("../middleware/authMiddleware");
 
-// Import student controller functions
-const {
-    addStudent,
-    getAllStudents,
-    getStudentById,
-    updateStudent,
-    deleteStudent,
-} = require("../controllers/studentController");
+const studentController = require("../controllers/studentController");
 
-// only student routes 
+// Student: Get own profile
+router.get(
+    "/profile/me",
+    protect,
+    authorize("student"),
+    studentController.getMyStudentProfile
+);
 
+// Admin routes
+router.post("/", protect, authorize("admin"), studentController.addStudent);
 
-// Add new student
-router.post("/", protect, authorize("admin"), addStudent);
+router.get("/", protect, authorize("admin"), studentController.getAllStudents);
 
-// Get all students
-router.get("/", protect, authorize("admin"), getAllStudents);
+router.get("/:id", protect, authorize("admin"), studentController.getStudentById);
 
-// Get single student by ID
-router.get("/:id", protect, authorize("admin"), getStudentById);
+router.put("/:id", protect, authorize("admin"), studentController.updateStudent);
 
-// Update student
-router.put("/:id", protect, authorize("admin"), updateStudent);
+router.delete("/:id", protect, authorize("admin"), studentController.deleteStudent);
 
-// Delete student
-router.delete("/:id", protect, authorize("admin"), deleteStudent);
-
-// Export router
 module.exports = router;

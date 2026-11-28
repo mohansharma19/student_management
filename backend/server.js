@@ -3,10 +3,10 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
-// Database connection
+// Database
 const connectDB = require("./config/db");
 
-// Import routes
+// Routes
 const authRoute = require("./routes/authRoute");
 const studentRoute = require("./routes/studentRoute");
 const attendanceRoute = require("./routes/attendanceRoute");
@@ -15,58 +15,66 @@ const dailyReportRoutes = require("./routes/dailyReportRoute");
 const homeworkRoutes = require("./routes/homeworkRoute");
 const homeworkSubmissionRoutes = require("./routes/homeworkSubmissionRoute");
 const profileRoute = require("./routes/profileRoute");
-const adminDashboard = require("./routes/adminDashboardRoute");
+const adminDashboardRoute = require("./routes/adminDashboardRoute");
 const studentDashboardRoute = require("./routes/studentDashboardRoute");
+const dailyTaskRoutes = require("./routes/dailyTaskRoutes");
 
 const app = express();
 
 // Middleware
-app.use(cors({
-    origin: "http://localhost:5173",
-    credentials: true,
-}));
+app.use(
+    cors({
+        origin: "http://localhost:5173",
+        credentials: true,
+    })
+);
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Home route
+// Health Check
 app.get("/", (req, res) => {
-    res.send("EduTrack backend is running");
+    res.status(200).json({
+        success: true,
+        message: "EduTrack Backend is running",
+    });
 });
 
-// Authentication APIs
+// API Routes
 app.use("/api/auth", authRoute);
-
-// Student Management APIs
-app.use("/api/students", studentRoute);
-
-// Attendance APIs
+app.use("/api/students", studentRoute); // Updated
 app.use("/api/attendance", attendanceRoute);
-
-// Marks APIs
 app.use("/api/marks", marksRoute);
-
-// Daily Reports APIs
 app.use("/api/daily-reports", dailyReportRoutes);
-
-// Homework APIs
 app.use("/api/homework", homeworkRoutes);
-
-// Homework Submission APIs
 app.use("/api/homework-submissions", homeworkSubmissionRoutes);
-
-// Profile Management APIs
 app.use("/api/profile", profileRoute);
-
-// Admin Dashboard APIs
-app.use("/api/dashboard", adminDashboard);
-
-// student dashboard apis
+app.use("/api/dashboard", adminDashboardRoute);
 app.use("/api/student/dashboard", studentDashboardRoute);
+app.use("/api/daily-tasks", dailyTaskRoutes);
 
-// Server configuration
+// 404 Handler
+app.use((req, res) => {
+    res.status(404).json({
+        success: false,
+        message: `Route not found: ${req.method} ${req.originalUrl}`,
+    });
+});
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+    console.error("Server Error:", err);
+
+    res.status(err.status || 500).json({
+        success: false,
+        message: err.message || "Internal Server Error",
+    });
+});
+
+// Server Configuration
 const PORT = process.env.PORT || 5000;
 
-// Start server after database connection
+// Start Server
 const startServer = async () => {
     try {
         await connectDB();
@@ -74,9 +82,8 @@ const startServer = async () => {
         app.listen(PORT, () => {
             console.log(`Server running on http://localhost:${PORT}`);
         });
-
     } catch (error) {
-        console.error("Server startup failed:", error.message);
+        console.error("Server startup failed:", error);
         process.exit(1);
     }
 };

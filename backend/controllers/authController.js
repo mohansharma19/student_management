@@ -1,5 +1,7 @@
 
 const User = require("../models/User");
+const Student = require("../models/Student");
+
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
@@ -14,12 +16,29 @@ const generateToken = (id) => {
     );
 };
 
-// REGISTER USER (Student only)
+// REGISTER USER (Student)
 const registerUser = async (req, res) => {
-    try {
-        const { name, email, password } = req.body;
+    let createdUser = null;
+    let studentCreated = false;
 
-        if (!name || !email || !password) {
+    try {
+        const {
+            name,
+            email,
+            password,
+            rollNumber,
+            className,
+            section,
+        } = req.body;
+
+        // Validate required fields
+        if (
+            !name ||
+            !email ||
+            !password ||
+            !rollNumber ||
+            !className
+        ) {
             return res.status(400).json({
                 success: false,
                 message: "Please fill all required fields",
@@ -40,8 +59,10 @@ const registerUser = async (req, res) => {
             });
         }
 
-        const normalizedEmail = email.toLowerCase().trim();
+        const normalizedEmail = email.trim().toLowerCase();
+        const normalizedRollNumber = rollNumber.trim();
 
+        // Check existing email
         const existingUser = await User.findOne({
             email: normalizedEmail,
         });
@@ -53,8 +74,22 @@ const registerUser = async (req, res) => {
             });
         }
 
+        // Check existing roll number
+        const existingStudent = await Student.findOne({
+            rollNumber: normalizedRollNumber,
+        });
+
+        if (existingStudent) {
+            return res.status(409).json({
+                success: false,
+                message: "Roll number already exists",
+            });
+        }
+
+        // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
 
+        // Generate email verification token
         const verificationToken = crypto.randomBytes(32).toString("hex");
 
         const hashedToken = crypto
@@ -62,7 +97,8 @@ const registerUser = async (req, res) => {
             .update(verificationToken)
             .digest("hex");
 
-        const user = await User.create({
+        // Create User
+        createdUser = await User.create({
             name: name.trim(),
             email: normalizedEmail,
             password: hashedPassword,
@@ -74,27 +110,34 @@ const registerUser = async (req, res) => {
             ),
         });
 
+        // Create Student Profile
+        await Student.create({
+            user: createdUser._id,
+            rollNumber: normalizedRollNumber,
+            className: className.trim(),
+            section: section?.trim() || "",
+        });
+
+        studentCreated = true;
+
+        // Generate verification link
         const verificationLink =
             `${process.env.FRONTEND_URL.replace(/\/$/, "")}/verify-email?token=${verificationToken}`;
 
-        try {
-            await sendEmail(
-                user.email,
-                "Verify Your EduTrack Account",
-                `
-                <div style="font-family: Arial; padding: 20px;">
-                    <h2>Hello ${user.name}!</h2>
-                    <p>Thank you for registering with EduTrack.</p>
-                    <p>Click below to verify your email:</p>
-                    <a href="${verificationLink}">Verify Email</a>
-                    <p>This link expires in 10 minutes.</p>
-                </div>
-                `
-            );
-        } catch (emailError) {
-            await User.findByIdAndDelete(user._id);
-            throw emailError;
-        }
+        // Send verification email
+        await sendEmail(
+            createdUser.email,
+            "Verify Your EduTrack Account",
+            `
+            <div style="font-family: Arial; padding: 20px;">
+                <h2>Hello ${createdUser.name}!</h2>
+                <p>Thank you for registering with EduTrack.</p>
+                <p>Click below to verify your email:</p>
+                <a href="${verificationLink}">Verify Email</a>
+                <p>This link expires in 10 minutes.</p>
+            </div>
+            `
+        );
 
         return res.status(201).json({
             success: true,
@@ -104,9 +147,27 @@ const registerUser = async (req, res) => {
     } catch (error) {
         console.error("REGISTER ERROR:", error);
 
+        // Rollback created records if registration fails
+        if (createdUser) {
+            if (studentCreated) {
+                await Student.deleteOne({
+                    user: createdUser._id,
+                }).catch((rollbackError) => {
+                    console.error("Student rollback error:", rollbackError);
+                });
+            }
+
+            await User.findByIdAndDelete(createdUser._id).catch(
+                (rollbackError) => {
+                    console.error("User rollback error:", rollbackError);
+                }
+            );
+        }
+
         return res.status(500).json({
             success: false,
             message: "Registration failed",
+            error: error.message,
         });
     }
 };
@@ -130,7 +191,9 @@ const verifyEmail = async (req, res) => {
 
         const user = await User.findOne({
             emailVerificationTokenHash: hashedToken,
-            emailVerificationTokenExpires: { $gt: new Date() },
+            emailVerificationTokenExpires: {
+                $gt: new Date(),
+            },
         });
 
         if (!user) {
@@ -162,8 +225,6 @@ const verifyEmail = async (req, res) => {
 };
 
 // LOGIN USER (Admin + Student)
-
-// LOGIN USER (Admin + Student)
 const loginUser = async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -184,28 +245,22 @@ const loginUser = async (req, res) => {
 
         const normalizedEmail = email.trim().toLowerCase();
 
-        // Find user and include password
         const user = await User.findOne({
             email: normalizedEmail,
         }).select("+password");
 
         if (!user) {
-            console.log("RESULT: User not found");
-
-
             return res.status(401).json({
                 success: false,
                 message: "Invalid email or password",
             });
         }
 
-
         // Compare password
         const isMatch = await bcrypt.compare(
             password,
             user.password
         );
-
 
         if (!isMatch) {
             return res.status(401).json({
@@ -214,6 +269,7 @@ const loginUser = async (req, res) => {
             });
         }
 
+        // Verify email
         if (!user.isEmailVerified) {
             return res.status(403).json({
                 success: false,

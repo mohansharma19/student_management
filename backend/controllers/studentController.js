@@ -1,8 +1,9 @@
+
 const Student = require("../models/Student");
 const User = require("../models/User");
+const bcrypt = require("bcryptjs");
 
-// new student ko add kar rha hu 
-
+// Add new student
 const addStudent = async (req, res) => {
     try {
         const {
@@ -20,7 +21,6 @@ const addStudent = async (req, res) => {
             parentPhone,
         } = req.body;
 
-        // required feild check kar rhe h
         if (!name || !email || !password || !rollNumber || !className) {
             return res.status(400).json({
                 success: false,
@@ -28,7 +28,6 @@ const addStudent = async (req, res) => {
             });
         }
 
-        // check email phle se to register nhi h 
         const existingUser = await User.findOne({
             email: email.toLowerCase().trim(),
         });
@@ -40,7 +39,6 @@ const addStudent = async (req, res) => {
             });
         }
 
-        // Check whether roll number already exists
         const existingStudent = await Student.findOne({ rollNumber });
 
         if (existingStudent) {
@@ -50,8 +48,6 @@ const addStudent = async (req, res) => {
             });
         }
 
-        // student login profile 
-        const bcrypt = require("bcryptjs");
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const user = await User.create({
@@ -62,7 +58,6 @@ const addStudent = async (req, res) => {
             isEmailVerified: true,
         });
 
-        // student acedemic profile 
         const student = await Student.create({
             user: user._id,
             rollNumber,
@@ -92,7 +87,7 @@ const addStudent = async (req, res) => {
 };
 
 
-// get all student 
+// Get all students
 const getAllStudents = async (req, res) => {
     try {
         const students = await Student.find()
@@ -115,7 +110,7 @@ const getAllStudents = async (req, res) => {
 };
 
 
-// get single student 
+// Get single student
 const getStudentById = async (req, res) => {
     try {
         const student = await Student.findById(req.params.id)
@@ -142,8 +137,8 @@ const getStudentById = async (req, res) => {
     }
 };
 
-// updating student 
 
+// Update student
 const updateStudent = async (req, res) => {
     try {
         const allowedFields = [
@@ -158,7 +153,6 @@ const updateStudent = async (req, res) => {
             "parentPhone",
         ];
 
-        // kewal approved feild ke liye student ko allow kar rhe h 
         const updates = {};
 
         allowedFields.forEach((field) => {
@@ -199,7 +193,7 @@ const updateStudent = async (req, res) => {
 };
 
 
-// delete student ka logic 
+// Delete student
 const deleteStudent = async (req, res) => {
     try {
         const student = await Student.findById(req.params.id);
@@ -211,10 +205,7 @@ const deleteStudent = async (req, res) => {
             });
         }
 
-        // Delete linked User account too
         await User.findByIdAndDelete(student.user);
-
-        // Delete student academic profile
         await student.deleteOne();
 
         return res.status(200).json({
@@ -232,12 +223,42 @@ const deleteStudent = async (req, res) => {
 };
 
 
-// export kar rha hu sara function 
+// Get logged-in student's own profile
+const getMyStudentProfile = async (req, res) => {
+    try {
+        const student = await Student.findOne({
+            user: req.user._id,
+        }).populate("user", "name email");
 
+        if (!student) {
+            return res.status(404).json({
+                success: false,
+                message: "Student profile not found",
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Student profile fetched successfully",
+            student,
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch student profile",
+            error: error.message,
+        });
+    }
+};
+
+
+// Export all controllers
 module.exports = {
     addStudent,
     getAllStudents,
     getStudentById,
     updateStudent,
     deleteStudent,
+    getMyStudentProfile,
 };

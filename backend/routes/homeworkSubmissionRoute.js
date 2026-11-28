@@ -2,7 +2,7 @@
 const express = require("express");
 const router = express.Router();
 
-// Import controller functions
+// Controllers
 const {
     submitHomework,
     getMySubmissions,
@@ -11,18 +11,47 @@ const {
     getSubmissionById,
 } = require("../controllers/homeworkSubmissionController");
 
-// Import authentication middleware
-const { protect } = require("../middleware/authMiddleware");
+// Middleware
+const {
+    protect,
+    authorize,
+} = require("../middleware/authMiddleware");
 
-// Student routes
-router.post("/:homeworkId", protect, submitHomework);
-router.get("/my", protect, getMySubmissions);
+// Student Routes
+router.post(
+    "/:homeworkId",
+    protect,
+    authorize("student"),
+    submitHomework
+);
 
-// Teacher/Admin routes
-router.get("/homework/:homeworkId", protect, getHomeworkSubmissions);
-router.put("/:id/review", protect, reviewSubmission);
+router.get(
+    "/my",
+    protect,
+    authorize("student"),
+    getMySubmissions
+);
 
-// Single submission
-router.get("/:id", protect, getSubmissionById);
+// Teacher/Admin Routes
+router.get(
+    "/homework/:homeworkId",
+    protect,
+    authorize("teacher", "admin"),
+    getHomeworkSubmissions
+);
+
+router.put(
+    "/:id/review",
+    protect,
+    authorize("teacher", "admin"),
+    reviewSubmission
+);
+
+// Single Submission
+router.get(
+    "/:id",
+    protect,
+    getSubmissionById
+);
 
 module.exports = router;

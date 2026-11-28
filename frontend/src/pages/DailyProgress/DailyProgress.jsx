@@ -1,72 +1,114 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import API from "../../services/api";
 
 const DailyProgress = () => {
     const [selectedDate, setSelectedDate] = useState(
-        new Date().toISOString().split("T")[0]
+        new Date().toLocaleDateString("en-CA")
     );
 
     const [tasks, setTasks] = useState([]);
-
     const [taskInput, setTaskInput] = useState("");
     const [editingId, setEditingId] = useState(null);
+    const [loading, setLoading] = useState(false);
 
-    // Add and Update Task
-    const handleSubmit = (e) => {
+    // Fetch tasks from backend
+    const fetchTasks = async () => {
+        try {
+            setLoading(true);
+
+            const res = await API.get("/daily-tasks");
+
+            setTasks(res.data.data || []);
+        } catch (error) {
+            console.error(error);
+            alert(
+                error.response?.data?.message ||
+                "Failed to fetch tasks"
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchTasks();
+    }, []);
+
+    // Add or Update Task
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
         if (!taskInput.trim()) return;
 
-        if (editingId) {
-            setTasks((prev) =>
-                prev.map((task) =>
-                    task.id === editingId
-                        ? { ...task, title: taskInput }
-                        : task
-                )
+        try {
+            if (editingId) {
+                await API.put(`/daily-tasks/${editingId}`, {
+                    title: taskInput.trim(),
+                });
+                setEditingId(null);
+            } else {
+                await API.post("/daily-tasks", {
+                    title: taskInput.trim(),
+                    date: selectedDate,
+                });
+            }
+
+            setTaskInput("");
+            fetchTasks();
+        } catch (error) {
+            alert(
+                error.response?.data?.message ||
+                "Unable to save task"
             );
-            setEditingId(null);
-        } else {
-            const newTask = {
-                id: Date.now(),
-                title: taskInput,
-                completed: false,
-                date: selectedDate,
-            };
-
-            setTasks((prev) => [...prev, newTask]);
         }
-
-        setTaskInput("");
     };
 
     // Edit Task
     const handleEdit = (task) => {
         setTaskInput(task.title);
-        setEditingId(task.id);
+        setEditingId(task._id);
     };
 
     // Delete Task
-    const handleDelete = (id) => {
-        setTasks((prev) => prev.filter((task) => task.id !== id));
+    const handleDelete = async (id) => {
+        if (!window.confirm("Are you sure you want to delete this task?")) {
+            return;
+        }
 
-        if (editingId === id) {
-            setEditingId(null);
-            setTaskInput("");
+        try {
+            await API.delete(`/daily-tasks/${id}`);
+
+            if (editingId === id) {
+                setEditingId(null);
+                setTaskInput("");
+            }
+
+            fetchTasks();
+        } catch (error) {
+            alert(
+                error.response?.data?.message ||
+                "Unable to delete task"
+            );
         }
     };
 
-    // Complete Task
-    const handleToggle = (id) => {
-        setTasks((prev) =>
-            prev.map((task) =>
-                task.id === id
-                    ? { ...task, completed: !task.completed }
-                    : task
-            )
-        );
+    // Complete / Incomplete Task
+    const handleToggle = async (task) => {
+        try {
+            await API.put(`/daily-tasks/${task._id}`, {
+                completed: !task.completed,
+            });
+
+            fetchTasks();
+        } catch (error) {
+            alert(
+                error.response?.data?.message ||
+                "Unable to update task"
+            );
+        }
     };
 
-    // Date-wise Tasks
+    // Filter tasks by selected date
     const filteredTasks = tasks.filter(
         (task) => task.date === selectedDate
     );
@@ -83,167 +125,159 @@ const DailyProgress = () => {
             : Math.round((completedTasks / totalTasks) * 100);
 
     return (
-        <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
+        <div className="max-w-4xl mx-auto p-6 space-y-6">
 
-            <div className="mx-auto max-w-5xl">
+            {/* Progress Card */}
+            <div className="bg-blue-600 text-white p-6 rounded-2xl shadow-lg">
 
-                {/* Header */}
-                <div className="mb-8">
-                    <h1 className="text-2xl font-bold text-slate-800 sm:text-3xl">
-                        Daily Progress Tracker
-                    </h1>
+                <h2 className="text-2xl font-bold">
+                    Daily Progress
+                </h2>
 
-                    <p className="mt-2 text-sm text-slate-500">
-                        Track your daily learning and stay consistent.
-                    </p>
+                <p className="mt-2 text-blue-100">
+                    Track your daily study goals
+                </p>
+
+                <div className="flex justify-between mt-6 mb-2">
+                    <span>Completed Tasks</span>
+                    <span>{completedTasks}/{totalTasks}</span>
                 </div>
 
-                {/* Progress Card */}
-                <div className="mb-6 rounded-2xl bg-blue-600 p-6 text-white shadow-lg">
-                    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-
-                        <div>
-                            <p className="text-sm text-blue-100">
-                                Your Daily Progress
-                            </p>
-
-                            <h2 className="mt-2 text-4xl font-bold">
-                                {progress}%
-                            </h2>
-
-                            <p className="mt-2 text-sm text-blue-100">
-                                {completedTasks} of {totalTasks} tasks completed
-                            </p>
-                        </div>
-
-                        <div className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-blue-300 text-2xl font-bold">
-                            {progress}%
-                        </div>
-                    </div>
-
-                    <div className="mt-6 h-3 overflow-hidden rounded-full bg-blue-400">
-                        <div
-                            className="h-full rounded-full bg-white transition-all duration-300"
-                            style={{ width: `${progress}%` }}
-                        />
-                    </div>
-                </div>
-
-                {/* Date Selection */}
-                <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <label className="mb-2 block text-sm font-semibold text-slate-700">
-                        Select Date
-                    </label>
-
-                    <input
-                        type="date"
-                        value={selectedDate}
-                        onChange={(e) => {
-                            setSelectedDate(e.target.value);
-                            setEditingId(null);
-                            setTaskInput("");
-                        }}
-                        className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 sm:w-auto"
+                <div className="w-full bg-blue-400 rounded-full h-3">
+                    <div
+                        className="bg-white h-3 rounded-full transition-all"
+                        style={{ width: `${progress}%` }}
                     />
                 </div>
 
-                {/* Add Task Form */}
-                <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <p className="text-right mt-2 font-semibold">
+                    {progress}% Completed
+                </p>
+            </div>
 
-                    <h2 className="mb-4 text-lg font-semibold text-slate-800">
-                        {editingId ? "Edit Study Task" : "Add New Study Task"}
-                    </h2>
+            {/* Date Selection */}
+            <div className="bg-white p-5 rounded-xl shadow">
+                <label className="block font-semibold mb-2">
+                    Select Date
+                </label>
 
-                    <form
-                        onSubmit={handleSubmit}
-                        className="flex flex-col gap-3 sm:flex-row"
+                <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => {
+                        setSelectedDate(e.target.value);
+                        setEditingId(null);
+                        setTaskInput("");
+                    }}
+                    className="border rounded-lg p-3 w-full"
+                />
+            </div>
+
+            {/* Add Task Form */}
+            <div className="bg-white p-5 rounded-xl shadow">
+
+                <h3 className="text-xl font-bold mb-4">
+                    {editingId ? "Edit Task" : "Add New Task"}
+                </h3>
+
+                <form onSubmit={handleSubmit} className="flex gap-3">
+
+                    <input
+                        type="text"
+                        value={taskInput}
+                        onChange={(e) => setTaskInput(e.target.value)}
+                        placeholder="Enter your daily task..."
+                        className="border rounded-lg p-3 flex-1 min-w-0"
+                    />
+
+                    <button
+                        type="submit"
+                        className="bg-blue-600 text-white px-5 py-3 rounded-lg hover:bg-blue-700"
                     >
-                        <input
-                            type="text"
-                            value={taskInput}
-                            onChange={(e) => setTaskInput(e.target.value)}
-                            placeholder="What did you study today?"
-                            className="min-w-0 flex-1 rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                        />
+                        {editingId ? "Update" : "Add"}
+                    </button>
 
+                    {editingId && (
                         <button
-                            type="submit"
-                            className="rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition hover:bg-blue-700"
+                            type="button"
+                            onClick={() => {
+                                setEditingId(null);
+                                setTaskInput("");
+                            }}
+                            className="bg-gray-500 text-white px-4 rounded-lg"
                         >
-                            {editingId ? "Update Task" : "Add Task"}
+                            Cancel
                         </button>
-                    </form>
-                </div>
+                    )}
 
-                {/* Task List */}
-                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                </form>
+            </div>
 
-                    <div className="mb-5 flex items-center justify-between">
-                        <h2 className="text-lg font-semibold text-slate-800">
-                            Today's Tasks
-                        </h2>
+            {/* Task List */}
+            <div className="bg-white p-5 rounded-xl shadow">
 
-                        <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-600">
-                            {totalTasks} Tasks
-                        </span>
-                    </div>
+                <h3 className="text-xl font-bold mb-4">
+                    Today's Tasks
+                </h3>
 
-                    {filteredTasks.length === 0 ? (
-                        <div className="py-10 text-center">
-                            <p className="text-lg font-medium text-slate-600">
-                                No tasks added yet!
-                            </p>
+                {loading ? (
+                    <p className="text-center py-6">Loading tasks...</p>
+                ) : filteredTasks.length === 0 ? (
+                    <p className="text-gray-500 text-center py-6">
+                        No tasks added for this date.
+                    </p>
+                ) : (
+                    <div className="space-y-3">
 
-                            <p className="mt-2 text-sm text-slate-400">
-                                Start by adding what you studied today.
-                            </p>
-                        </div>
-                    ) : (
-                        <div className="space-y-3">
-                            {filteredTasks.map((task) => (
-                                <div
-                                    key={task.id}
-                                    className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 p-4 transition hover:bg-slate-50"
-                                >
+                        {filteredTasks.map((task) => (
+                            <div
+                                key={task._id}
+                                className="flex flex-wrap items-center justify-between gap-3 border p-4 rounded-lg"
+                            >
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+
                                     <input
                                         type="checkbox"
                                         checked={task.completed}
-                                        onChange={() => handleToggle(task.id)}
-                                        className="h-5 w-5 cursor-pointer accent-blue-600"
+                                        onChange={() => handleToggle(task)}
+                                        className="w-5 h-5"
                                     />
 
-                                    <p
-                                        className={`min-w-0 flex-1 break-words text-sm font-medium ${task.completed
-                                                ? "text-slate-400 line-through"
-                                                : "text-slate-700"
+                                    <span
+                                        className={`break-words ${task.completed
+                                            ? "line-through text-gray-400"
+                                            : "text-gray-800"
                                             }`}
                                     >
                                         {task.title}
-                                    </p>
+                                    </span>
 
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            onClick={() => handleEdit(task)}
-                                            className="rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-600 hover:bg-amber-100"
-                                        >
-                                            Edit
-                                        </button>
-
-                                        <button
-                                            onClick={() => handleDelete(task.id)}
-                                            className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
-                                        >
-                                            Delete
-                                        </button>
-                                    </div>
                                 </div>
-                            ))}
-                        </div>
-                    )}
 
-                </div>
+                                <div className="flex gap-2">
 
+                                    <button
+                                        onClick={() => handleEdit(task)}
+                                        className="bg-yellow-500 text-white px-3 py-2 rounded-lg"
+                                    >
+                                        Edit
+                                    </button>
+
+                                    <button
+                                        onClick={() => handleDelete(task._id)}
+                                        className="bg-red-600 text-white px-3 py-2 rounded-lg"
+                                    >
+                                        Delete
+                                    </button>
+
+                                </div>
+                            </div>
+                        ))}
+
+                    </div>
+                )}
             </div>
+
         </div>
     );
 };

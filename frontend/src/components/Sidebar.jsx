@@ -1,15 +1,17 @@
-
 import React, { useState } from "react";
 
 import {
-    LayoutDashboard,
     User,
     CalendarCheck,
     LogOut,
     GraduationCap,
     Menu,
     X,
-    FileText
+    FileText,
+    ClipboardList,
+    NotebookPen,
+    FileCheck,
+    LayoutDashboard
 } from "lucide-react";
 
 import { NavLink, useNavigate } from "react-router-dom";
@@ -23,14 +25,13 @@ const Sidebar = () => {
     const menuItems = [
         {
             name: "Dashboard",
-            path: user?.role === "admin"
-                ? "/admin-dashboard"
-                : "/dashboard",
+            path: "/admin/dashboard",
             icon: LayoutDashboard,
         },
+
         {
             name: "Students",
-            path: "/students",
+            path: "/student/dashboard",
             icon: User,
         },
         {
@@ -44,15 +45,30 @@ const Sidebar = () => {
             icon: GraduationCap,
         },
         {
-            name: "Daily Report",
+            name: "Daily Task",
             path: "/daily-progress",
             icon: FileText,
+        },
+        {
+            name: "Daily Report",
+            path: "/daily-report",
+            icon: ClipboardList,
+        },
+        {
+            name: "Homework",
+            path: "/homework",
+            icon: NotebookPen,
+        },
+        {
+            name: "Homework Submission",
+            path: "/homework-submission",
+            icon: FileCheck,
         },
         {
             name: "Profile",
             path: "/profile",
             icon: User,
-        }
+        },
     ];
 
     const handleLogout = () => {
